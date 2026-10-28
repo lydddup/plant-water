@@ -147,13 +147,16 @@ header .date{font-size:13px;opacity:.85}
         </div>
         <div id="syncSetupBox">
           <input id="syncToken" class="token-input" type="password" placeholder="粘贴 GitHub Token（只需 gist 权限）" autocomplete="off" spellcheck="false">
+          <input id="syncGistId" class="token-input" type="text" placeholder="Gist ID（第二台设备才填，见下方说明）" autocomplete="off" spellcheck="false">
           <button class="btn-line" id="btnSyncStart">开启同步</button>
           <p class="tip">Token 获取：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token → <b>只勾选 gist</b> → 生成后粘贴到上面。</p>
+          <p class="tip"><b>只有第一台设备直接点「开启同步」</b>，它会新建云端数据。第二台设备：在已同步设备上打开 gist.github.com 找到「养花浇水提醒 · 数据同步」，网址末尾那串字符就是 Gist ID，把它和 Token 一起填到上面两个框再点「开启同步」，两台设备就会共用同一份数据。</p>
         </div>
         <div id="syncOnBox" hidden>
           <button class="btn-line" id="btnSyncNow">立即同步</button>
           <button class="btn-line" id="btnSyncOff">关闭同步</button>
           <p class="tip">数据保存在你自己的<b>私密 Gist</b> 里，只有你能访问。每次改动会自动同步，打开页面和切回前台时也会自动拉取。<br>Token 只存在本机浏览器，<b>不会</b>被写进导出的备份文件。</p>
+          <p class="tip">本机 Gist ID：<b id="syncGistIdText"></b><br>其他设备接入：把上面的 ID 和你的 Token 填进「Gist ID」输入框，点「开启同步」即可共用这份数据。</p>
         </div>
       </div>
 
@@ -412,6 +415,7 @@ header .date{font-size:13px;opacity:.85}
     $('#syncSetupBox').hidden = on;
     $('#syncOnBox').hidden = !on;
     $('#syncBadge').hidden = !on;
+    $('#syncGistIdText').textContent = on ? syncCfg.gistId : '';
     if (!on) {
       setSyncStatus('未开启 · 两端数据需要手动导入导出');
     } else if (syncCfg.lastSyncAt) {
@@ -455,12 +459,31 @@ header .date{font-size:13px;opacity:.85}
   async function syncStart() {
     const token = ($('#syncToken').value || '').trim();
     if (!token) { toast('请先粘贴 GitHub Token'); return; }
+    const gistId = ($('#syncGistId').value || '').trim();
+    if (gistId) {
+      setSyncStatus('正在接入 Gist…');
+      try {
+        await gistRequest('https://api.github.com/gists/' + encodeURIComponent(gistId), token, 'GET');
+        syncCfg = { token: token, gistId: gistId, lastSyncAt: '' };
+        saveSyncCfg();
+        $('#syncToken').value = '';
+        $('#syncGistId').value = '';
+        renderSync();
+        toast('已接入 Gist，开始同步');
+        syncNow(true);
+      } catch (e) {
+        setSyncStatus('接入失败：' + (e.message || '网络错误'));
+        toast('接入失败，请检查 Gist ID 与 Token');
+      }
+      return;
+    }
     setSyncStatus('正在创建私密 Gist…');
     try {
       const id = await gistCreate(token);
       syncCfg = { token: token, gistId: id, lastSyncAt: new Date().toISOString() };
       saveSyncCfg();
       $('#syncToken').value = '';
+      $('#syncGistId').value = '';
       renderSync();
       toast('同步已开启');
       syncNow(true);
