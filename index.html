@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>养花浇水提醒</title>
+<meta name="theme-color" content="#2f9e60">
+<meta name="description" content="记录家里每盆花的浇水情况，打开就能看到谁该浇了">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="养花提醒">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2288%22>%F0%9F%8C%B1</text></svg>">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f7f5; --card:#fff; --text:#17251d; --muted:#6d8279; --line:#e6ecea;
+  --brand:#2f9e60; --brand-dark:#24804d; --brand-soft:#e7f4ec;
+  --red:#e5484d; --orange:#f0760f; --yellow:#d99e0b; --green:#2f9e60;
+  --radius:14px; --shadow:0 1px 2px rgba(16,40,28,.05),0 4px 14px rgba(16,40,28,.06);
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text); line-height:1.5;
+  -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+  padding-bottom:calc(96px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px}
+
+header{background:linear-gradient(135deg,#2f9e60,#43b173);color:#fff;padding:calc(20px + env(safe-area-inset-top)) 0 40px}
+header .wrap{display:flex;align-items:baseline;justify-content:space-between}
+header h1{font-size:20px;font-weight:600;letter-spacing:.5px}
+header .date{font-size:13px;opacity:.85}
+.sync-badge{font-size:12px;opacity:.9}
+
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:-30px;position:relative;z-index:2}
+.summary .box{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 6px;text-align:center}
+.summary .num{font-size:23px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
+.summary .lbl{font-size:12px;color:var(--muted);margin-top:2px}
+.n-red{color:var(--red)} .n-orange{color:var(--orange)}
+
+.filters{display:flex;gap:8px;overflow-x:auto;padding:16px 0 4px;-webkit-overflow-scrolling:touch}
+.filters::-webkit-scrollbar{display:none}
+.f-chip{flex:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 15px;font-size:13px;cursor:pointer;color:var(--muted);font-family:inherit}
+.f-chip.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-top:12px;overflow:hidden;border-left:4px solid var(--line)}
+.card.lv-overdue{border-left-color:var(--red)}
+.card.lv-today{border-left-color:var(--orange)}
+.card.lv-soon{border-left-color:var(--yellow)}
+.card.lv-ok{border-left-color:var(--green)}
+.card-top{display:flex;align-items:center;gap:12px;padding:14px}
+.card-main{flex:1;min-width:0;cursor:pointer}
+.card-head{display:flex;align-items:center;gap:8px}
+.card-head h3{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loc{flex:none;font-size:12px;color:var(--muted);background:var(--bg);padding:2px 9px;border-radius:999px}
+.status{font-size:13px;color:var(--muted);margin-top:5px}
+.card.lv-overdue .status{color:var(--red);font-weight:600}
+.card.lv-today .status{color:var(--orange);font-weight:600}
+.card.lv-soon .status{color:var(--yellow)}
+.interval{font-size:12px;color:var(--muted);opacity:.75;margin-top:2px}
+.note{font-size:12px;color:var(--muted);margin-top:3px;opacity:.85}
+.btn-water{flex:none;background:var(--brand-soft);color:var(--brand-dark);border:none;border-radius:999px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-water:active{transform:scale(.95)}
+.card.open .card-top{padding-bottom:10px}
+
+.hist{border-top:1px solid var(--line);padding:12px 14px;background:#fbfdfc}
+.hist-title{font-size:12px;color:var(--muted);margin-bottom:8px}
+.hist ul{list-style:none;display:flex;flex-direction:column;gap:7px}
+.hist li{display:flex;align-items:center;gap:10px;font-size:13px}
+.hist .d{font-variant-numeric:tabular-nums;min-width:84px}
+.hist .g{color:var(--muted);font-size:12px;flex:1}
+.hist .a{color:var(--muted);font-size:12px;flex:none}
+.hist-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.btn-mini{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit}
+.btn-mini.danger{color:var(--red);border-color:#f2d5d6}
+
+.empty{text-align:center;padding:52px 20px;color:var(--muted)}
+.empty .ico{font-size:46px;margin-bottom:14px}
+.empty p{font-size:14px;margin-bottom:18px}
+.btn-seed{background:var(--brand);color:#fff;border:none;border-radius:11px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+
+.settings{margin-top:18px;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.settings summary{padding:15px;font-size:14px;font-weight:600;cursor:pointer;list-style:none}
+.settings summary::-webkit-details-marker{display:none}
+.settings summary::after{content:'▾';float:right;color:var(--muted)}
+.settings[open] summary::after{content:'▴'}
+.set-body{padding:0 15px 15px;display:flex;flex-direction:column;gap:14px}
+.row{display:flex;align-items:center;justify-content:space-between;font-size:14px;gap:12px}
+.row .hint{font-size:12px;color:var(--muted);margin-top:2px}
+.row input[type=number]{width:64px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:14px;font-family:inherit;text-align:center}
+.row input[type=checkbox]{width:20px;height:20px;accent-color:var(--brand)}
+.btn-line{width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;color:var(--text);font-family:inherit}
+.tip{font-size:12px;color:var(--muted);line-height:1.6}
+
+.sync{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;background:#fbfdfc}
+.token-input{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit;color:var(--text);background:#fff}
+.token-input:focus{outline:none;border-color:var(--brand)}
+
+.fab{position:fixed;right:20px;bottom:calc(26px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:50%;background:var(--brand);color:#fff;border:none;font-size:30px;line-height:1;box-shadow:0 6px 20px rgba(47,158,96,.42);cursor:pointer;z-index:20}
+.fab:active{transform:scale(.94)}
+
+.mask{position:fixed;inset:0;background:rgba(14,28,21,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+.mask.show{display:flex}
+.sheet{background:#fff;border-radius:18px;width:100%;max-width:420px;max-height:86vh;overflow:auto;padding:20px}
+.sheet h2{font-size:17px;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.field input{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;color:var(--text);background:#fff}
+.field input:focus{outline:none;border-color:var(--brand)}
+.sheet-actions{display:flex;gap:10px;margin-top:20px}
+.btn{flex:1;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--brand);color:#fff}
+.btn.ghost{background:var(--bg);color:var(--text)}
+.btn.danger{background:var(--red);color:#fff}
+
+#toast{position:fixed;left:16px;right:16px;bottom:calc(26px + env(safe-area-inset-bottom));background:#17251d;color:#fff;border-radius:12px;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;box-shadow:0 8px 26px rgba(0,0,0,.26);transform:translateY(160%);transition:transform .25s;z-index:60}
+#toast.show{transform:translateY(0)}
+#toast button{background:none;border:none;color:#7fd7a5;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>🌱 养花浇水提醒</h1>
+    <span class="date"><span id="todayLabel"></span><span class="sync-badge" id="syncBadge" hidden> · ☁ 已同步</span></span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="summary">
+    <div class="box"><div class="num" id="sTotal">0</div><div class="lbl">共几盆</div></div>
+    <div class="box"><div class="num n-orange" id="sDue">0</div><div class="lbl">今天该浇</div></div>
+    <div class="box"><div class="num n-red" id="sOver">0</div><div class="lbl">已逾期</div></div>
+  </section>
+
+  <nav class="filters" id="filters"></nav>
+  <div id="list"></div>
+
+  <details class="settings">
+    <summary>设置与备份</summary>
+    <div class="set-body">
+      <div class="sync">
+        <div class="row">
+          <div>云同步（GitHub Gist）<div class="hint" id="syncStatus">未开启 · 两端数据需要手动导入导出</div></div>
+        </div>
+        <div id="syncSetupBox">
+          <input id="syncToken" class="token-input" type="password" placeholder="粘贴 GitHub Token（只需 gist 权限）" autocomplete="off" spellcheck="false">
+          <button class="btn-line" id="btnSyncStart">开启同步</button>
+          <p class="tip">Token 获取：GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token → <b>只勾选 gist</b> → 生成后粘贴到上面。</p>
+        </div>
+        <div id="syncOnBox" hidden>
+          <button class="btn-line" id="btnSyncNow">立即同步</button>
+          <button class="btn-line" id="btnSyncOff">关闭同步</button>
+          <p class="tip">数据保存在你自己的<b>私密 Gist</b> 里，只有你能访问。每次改动会自动同步，打开页面和切回前台时也会自动拉取。<br>Token 只存在本机浏览器，<b>不会</b>被写进导出的备份文件。</p>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>季节系数<div class="hint">夏季间隔 ×0.7，冬季 ×1.3</div></div>
+        <input type="checkbox" id="seasonal">
+      </div>
+      <div class="row">
+        <div>提前几天算「快该浇了」</div>
+        <input type="number" id="soonDays" min="0" max="7" step="1">
+      </div>
+      <button class="btn-line" id="btnExport">导出备份（JSON）</button>
+      <button class="btn-line" id="btnImport">导入备份</button>
+      <input type="file" id="fileInput" accept="application/json,.json" hidden>
+      <button class="btn-line" id="btnUndo">撤销上一步操作</button>
+      <p class="tip">未开启云同步时，数据只在这台设备的浏览器里，不会上传到任何服务器。<b>换设备或清理浏览器缓存前，请先导出备份。</b></p>
+    </div>
+  </details>
+</main>
+
+<button class="fab" id="fab" aria-label="添加植物">＋</button>
+
+<div class="mask" id="plantMask">
+  <div class="sheet">
+    <h2 id="plantTitle">添加植物</h2>
+    <form id="plantForm">
+      <div class="field"><label>名称</label><input id="fName" placeholder="例如：绿萝" required></div>
+      <div class="field"><label>位置</label><input id="fLoc" list="locList" placeholder="例如：阳台"><datalist id="locList"></datalist></div>
+      <div class="field"><label>浇水间隔（天）</label><input id="fInterval" type="number" min="1" max="365" step="1" value="7"></div>
+      <div class="field"><label>上次浇水日</label><input id="fLast" type="date"></div>
+      <div class="field"><label>备注（选填）</label><input id="fNote" placeholder="例如：见干见湿"></div>
+      <div class="sheet-actions">
+        <button type="button" class="btn ghost" data-close>取消</button>
+        <button type="submit" class="btn primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="mask" id="waterMask">
+  <div class="sheet">
+    <h2 id="waterTitle">记录浇水</h2>
+    <div class="field"><label>浇水日期</label><input id="wDate" type="date"></div>
+    <div class="sheet-actions">
+      <button type="button" class="btn ghost" data-close>取消</button>
+      <button type="button" class="btn primary" id="wOk">记录</button>
+    </div>
+  </div>
+</div>
+
+<div class="mask" id="confirmMask">
+  <div class="sheet">
+    <h2 id="confirmTitle">确认</h2>
+    <p id="confirmMsg" style="font-size:14px;color:var(--muted)"></p>
+    <div class="sheet-actions">
+      <button type="button" class="btn ghost" data-close>取消</button>
+      <button type="button" class="btn danger" id="confirmOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><span id="toastMsg"></span></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const STORE_KEY = 'flower-water-reminder:v1';
+  const SYNC_KEY = 'flower-water-reminder:sync';
+  const GIST_FILE = 'flower-water-reminder.json';
+  const SEASON_FACTOR = { 1:1.3, 2:1.3, 3:1, 4:1, 5:1, 6:0.7, 7:0.7, 8:0.7, 9:1, 10:1, 11:1, 12:1.3 };
+
+  const $ = s => document.querySelector(s);
+  const uid = () => 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  /* ---------- 日期工具：全部基于本地时间，避免 toISOString 的时区偏移 ---------- */
+  function fmt(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function todayStr() { return fmt(new Date()); }
+  function parseDate(s) {
+    const p = String(s).split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2]);
+  }
+  function dayDiff(from, to) { return Math.round((parseDate(to) - parseDate(from)) / 86400000); }
+  function addDays(s, n) { const d = parseDate(s); d.setDate(d.getDate() + n); return fmt(d); }
+  function shortDate(s) { return s ? s.slice(5) : ''; }
+  function hhmm(d) {
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  /* ---------- 状态 ---------- */
+  let state = load();
+  let syncCfg = loadSync();
+  let undoStack = [];
+  let syncing = false;
+  let syncTimer = null;
+  const expanded = new Set();
+  let filter = '全部';
+  let editingId = null;
+  let wateringId = null;
+  let confirmFn = null;
+
+  function defaultState() {
+    return {
+      version: 1,
+      updatedAt: '',
+      deletedIds: [],
+      settings: { seasonalEnabled: true, soonDays: 2 },
+      plants: []
+    };
+  }
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  function isDate(s) {
+    if (typeof s !== 'string' || !DATE_RE.test(s)) return false;
+    const p = s.split('-').map(Number);
+    const d = new Date(p[0], p[1] - 1, p[2]);
+    return d.getFullYear() === p[0] && d.getMonth() === p[1] - 1 && d.getDate() === p[2];
+  }
+
+  function normalizePlant(p) {
+    return {
+      id: p.id || uid(),
+      name: String(p.name || '未命名'),
+      location: String(p.location || '未分类'),
+      intervalDays: Math.max(1, parseInt(p.intervalDays, 10) || 7),
+      note: String(p.note || ''),
+      createdAt: isDate(p.createdAt) ? p.createdAt : todayStr(),
+      waterings: Array.isArray(p.waterings) ? p.waterings.filter(isDate).sort() : []
+    };
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return defaultState();
+      const s = JSON.parse(raw);
+      if (!s || !Array.isArray(s.plants)) return defaultState();
+      return {
+        version: s.version || 1,
+        updatedAt: typeof s.updatedAt === 'string' ? s.updatedAt : '',
+        deletedIds: Array.isArray(s.deletedIds) ? s.deletedIds.filter(x => typeof x === 'string') : [],
+        settings: Object.assign({ seasonalEnabled: true, soonDays: 2 }, s.settings || {}),
+        plants: s.plants.map(normalizePlant)
+      };
+    } catch (e) {
+      return defaultState();
+    }
+  }
+  function save() {
+    state.updatedAt = new Date().toISOString();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch (e) { toast('保存失败：浏览器存储空间不足'); }
+  }
+
+  /* ---------- 云同步配置：独立存储，导入备份不会覆盖 ---------- */
+  function loadSync() {
+    try {
+      const raw = localStorage.getItem(SYNC_KEY);
+      if (!raw) return null;
+      const c = JSON.parse(raw);
+      if (!c || !c.token || !c.gistId) return null;
+      return { token: c.token, gistId: c.gistId, lastSyncAt: c.lastSyncAt || '' };
+    } catch (e) { return null; }
+  }
+  function saveSyncCfg() {
+    try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncCfg)); } catch (e) {}
+  }
+  function syncReady() { return !!(syncCfg && syncCfg.token && syncCfg.gistId); }
+
+  /* ---------- GitHub Gist API ---------- */
+  async function gistRequest(url, token, method, body) {
+    const opt = {
+      method: method,
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+      }
+    };
+    if (body) opt.body = JSON.stringify(body);
+    const r = await fetch(url, opt);
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('Token 无效或已过期');
+      if (r.status === 404) throw new Error('Gist 不存在，可能已被删除');
+      if (r.status === 403) throw new Error('请求被拒绝，可能触发速率限制');
+      throw new Error('网络错误 ' + r.status);
+    }
+    return r.json();
+  }
+  async function gistCreate(token) {
+    const j = await gistRequest('https://api.github.com/gists', token, 'POST', {
+      description: '养花浇水提醒 · 数据同步',
+      public: false,
+      files: { [GIST_FILE]: { content: JSON.stringify(state, null, 2) } }
+    });
+    return j.id;
+  }
+  async function gistGet() {
+    const j = await gistRequest('https://api.github.com/gists/' + encodeURIComponent(syncCfg.gistId), syncCfg.token, 'GET');
+    const f = j.files && j.files[GIST_FILE];
+    if (!f || !f.content) return null;
+    let d;
+    try { d = JSON.parse(f.content); } catch (e) { return null; }
+    if (!d || !Array.isArray(d.plants)) return null;
+    return {
+      version: d.version || 1,
+      updatedAt: typeof d.updatedAt === 'string' ? d.updatedAt : '',
+      deletedIds: Array.isArray(d.deletedIds) ? d.deletedIds : [],
+      settings: d.settings || {},
+      plants: d.plants.map(normalizePlant)
+    };
+  }
+  async function gistUpdate() {
+    await gistRequest('https://api.github.com/gists/' + encodeURIComponent(syncCfg.gistId), syncCfg.token, 'PATCH', {
+      files: { [GIST_FILE]: { content: JSON.stringify(state, null, 2) } }
+    });
+  }
+
+  /* ---------- 合并：以 updatedAt 较新的一方为底，浇水记录取并集，删除用墓碑 ---------- */
+  function mergeState(a, b) {
+    const base = (b.updatedAt || '') > (a.updatedAt || '') ? b : a;
+    const other = base === b ? a : b;
+    const deleted = new Set([].concat(base.deletedIds || [], other.deletedIds || []));
+    const map = new Map();
+    base.plants.forEach(p => {
+      if (deleted.has(p.id)) return;
+      map.set(p.id, Object.assign({}, p, { waterings: p.waterings.slice() }));
+    });
+    other.plants.forEach(p => {
+      if (deleted.has(p.id)) return;
+      const cur = map.get(p.id);
+      if (cur) {
+        cur.waterings = Array.from(new Set(cur.waterings.concat(p.waterings))).sort();
+      } else {
+        map.set(p.id, Object.assign({}, p, { waterings: p.waterings.slice() }));
+      }
+    });
+    return {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      deletedIds: Array.from(deleted).slice(-200),
+      settings: Object.assign({ seasonalEnabled: true, soonDays: 2 }, base.settings || {}),
+      plants: Array.from(map.values()).map(normalizePlant)
+    };
+  }
+
+  /* ---------- 同步调度 ---------- */
+  function setSyncStatus(text) {
+    const el = $('#syncStatus');
+    if (el) el.textContent = text;
+  }
+  function renderSync() {
+    const on = syncReady();
+    $('#syncSetupBox').hidden = on;
+    $('#syncOnBox').hidden = !on;
+    $('#syncBadge').hidden = !on;
+    if (!on) {
+      setSyncStatus('未开启 · 两端数据需要手动导入导出');
+    } else if (syncCfg.lastSyncAt) {
+      const d = new Date(syncCfg.lastSyncAt);
+      setSyncStatus(isNaN(d.getTime())
+        ? '已开启 · 尚未同步'
+        : '已开启 · 上次同步 ' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hhmm(d));
+    } else {
+      setSyncStatus('已开启 · 尚未同步');
+    }
+  }
+  function scheduleSync() {
+    if (!syncReady()) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncNow(true), 1200);
+  }
+  async function syncNow(silent) {
+    if (!syncReady() || syncing) return;
+    syncing = true;
+    clearTimeout(syncTimer);
+    try {
+      setSyncStatus('同步中…');
+      const remote = await gistGet();
+      if (remote) {
+        state = mergeState(state, remote);
+        save();
+        render();
+      }
+      await gistUpdate();
+      syncCfg.lastSyncAt = new Date().toISOString();
+      saveSyncCfg();
+      renderSync();
+      if (!silent) toast('已同步');
+    } catch (e) {
+      setSyncStatus('同步失败：' + (e.message || '网络错误'));
+      if (!silent) toast('同步失败：' + (e.message || '网络错误'));
+    } finally {
+      syncing = false;
+    }
+  }
+  async function syncStart() {
+    const token = ($('#syncToken').value || '').trim();
+    if (!token) { toast('请先粘贴 GitHub Token'); return; }
+    setSyncStatus('正在创建私密 Gist…');
+    try {
+      const id = await gistCreate(token);
+      syncCfg = { token: token, gistId: id, lastSyncAt: new Date().toISOString() };
+      saveSyncCfg();
+      $('#syncToken').value = '';
+      renderSync();
+      toast('同步已开启');
+      syncNow(true);
+    } catch (e) {
+      setSyncStatus('开启失败：' + (e.message || '网络错误'));
+      toast('开启失败，请确认 Token 已勾选 gist 权限');
+    }
+  }
+  function syncStop() {
+    syncCfg = null;
+    try { localStorage.removeItem(SYNC_KEY); } catch (e) {}
+    renderSync();
+    toast('已关闭云同步（本地数据保留）');
+  }
+
+  /* ---------- 核心计算 ---------- */
+  function computeStatus(plant, today) {
+    const last = plant.waterings.length
+      ? plant.waterings[plant.waterings.length - 1]
+      : plant.createdAt;
+    const month = new Date().getMonth() + 1;
+    const factor = state.settings.seasonalEnabled ? (SEASON_FACTOR[month] || 1) : 1;
+    const interval = Math.max(1, Math.round(plant.intervalDays * factor));
+    const daysSince = dayDiff(last, today);
+    const daysUntil = interval - daysSince;
+
+    let level;
+    if (daysUntil < 0) level = 'overdue';
+    else if (daysUntil === 0) level = 'today';
+    else if (daysUntil <= state.settings.soonDays) level = 'soon';
+    else level = 'ok';
+
+    return { last, interval, daysSince, daysUntil, level };
+  }
+  function statusLabel(st) {
+    if (st.daysUntil < 0) return '逾期 ' + (-st.daysUntil) + ' 天 · 上次 ' + shortDate(st.last);
+    if (st.daysUntil === 0) return '今天该浇 · 上次 ' + shortDate(st.last);
+    if (st.daysUntil <= state.settings.soonDays) return '快该浇了 · 还剩 ' + st.daysUntil + ' 天';
+    return '还剩 ' + st.daysUntil + ' 天 · 上次 ' + shortDate(st.last);
+  }
+
+  /* ---------- 变更与撤销 ---------- */
+  function mutate(fn) {
+    undoStack.push(JSON.parse(JSON.stringify(state.plants)));
+    if (undoStack.length > 20) undoStack.shift();
+    fn();
+    save(); render(); scheduleSync();
+  }
+  function undo() {
+    if (!undoStack.length) { toast('没有可撤销的操作'); return; }
+    state.plants = undoStack.pop();
+    save(); render(); scheduleSync(); toast('已撤销上一步');
+  }
+
+  /* ---------- 渲染 ---------- */
+  function render() {
+    $('#todayLabel').textContent = todayStr().replace(/-/g, '.');
+    $('#seasonal').checked = !!state.settings.seasonalEnabled;
+    $('#soonDays').value = state.settings.soonDays;
+    renderSummary();
+    renderFilters();
+    renderList();
+    renderLocList();
+  }
+
+  function renderSummary() {
+    const today = todayStr();
+    let due = 0, over = 0;
+    state.plants.forEach(p => {
+      const st = computeStatus(p, today);
+      if (st.daysUntil <= 0) due++;
+      if (st.daysUntil < 0) over++;
+    });
+    $('#sTotal').textContent = state.plants.length;
+    $('#sDue').textContent = due;
+    $('#sOver').textContent = over;
+  }
+
+  function renderFilters() {
+    const locs = Array.from(new Set(state.plants.map(p => p.location))).sort();
+    const all = ['全部'].concat(locs);
+    if (all.indexOf(filter) === -1) filter = '全部';
+    $('#filters').innerHTML = all.map(l =>
+      '<button class="f-chip' + (l === filter ? ' on' : '') + '" data-loc="' + esc(l) + '">' + esc(l) + '</button>'
+    ).join('');
+  }
+
+  function renderList() {
+    const today = todayStr();
+    const items = state.plants
+      .map(p => ({ plant: p, st: computeStatus(p, today) }))
+      .sort((a, b) => a.st.daysUntil - b.st.daysUntil || a.plant.name.localeCompare(b.plant.name, 'zh'));
+    const shown = filter === '全部' ? items : items.filter(i => i.plant.location === filter);
+
+    if (!state.plants.length) {
+      $('#list').innerHTML =
+        '<div class="empty"><div class="ico">🪴</div>' +
+        '<p>还没有记录任何花<br>添加第一盆，或先看看示例</p>' +
+        '<button class="btn-seed" id="btnSeed">载入示例植物</button></div>';
+      $('#btnSeed').onclick = seedDemo;
+      return;
+    }
+    if (!shown.length) {
+      $('#list').innerHTML = '<div class="empty"><div class="ico">🌿</div><p>这个位置还没有植物</p></div>';
+      return;
+    }
+    $('#list').innerHTML = shown.map(cardHtml).join('');
+  }
+
+  function cardHtml(item) {
+    const p = item.plant, st = item.st;
+    const open = expanded.has(p.id);
+    return '<article class="card lv-' + st.level + (open ? ' open' : '') + '" data-id="' + p.id + '">' +
+      '<div class="card-top">' +
+        '<div class="card-main" data-act="toggle">' +
+          '<div class="card-head"><h3>' + esc(p.name) + '</h3><span class="loc">' + esc(p.location) + '</span></div>' +
+          '<p class="status">' + statusLabel(st) + '</p>' +
+          '<p class="interval">每 ' + p.intervalDays + ' 天浇一次' + (st.interval !== p.intervalDays ? ' · 季节修正后 ' + st.interval + ' 天' : '') + '</p>' +
+          (p.note ? '<p class="note">' + esc(p.note) + '</p>' : '') +
+        '</div>' +
+        '<button class="btn-water" data-act="water">浇了</button>' +
+      '</div>' +
+      (open ? historyHtml(p) : '') +
+    '</article>';
+  }
+
+  function historyHtml(p) {
+    const w = p.waterings.slice().sort().reverse().slice(0, 8);
+    const today = todayStr();
+    let body;
+    if (!w.length) {
+      body = '<p class="hist-title">还没有浇水记录</p>';
+    } else {
+      body = '<p class="hist-title">浇水记录（最近 ' + w.length + ' 次）</p><ul>' +
+        w.map((d, i) => {
+          const prev = w[i + 1];
+          const gap = prev ? '间隔 ' + dayDiff(prev, d) + ' 天' : '最早一次';
+          const ago = dayDiff(d, today);
+          return '<li><span class="d">' + esc(d) + '</span><span class="g">' + gap + '</span>' +
+                 '<span class="a">' + (ago === 0 ? '今天' : ago + ' 天前') + '</span></li>';
+        }).join('') + '</ul>';
+    }
+    return '<div class="hist">' + body +
+      '<div class="hist-actions">' +
+        '<button class="btn-mini" data-act="add">补记一次</button>' +
+        '<button class="btn-mini" data-act="edit">编辑</button>' +
+        '<button class="btn-mini danger" data-act="del">删除</button>' +
+      '</div></div>';
+  }
+
+  function renderLocList() {
+    const locs = Array.from(new Set(state.plants.map(p => p.location))).sort();
+    $('#locList').innerHTML = locs.map(l => '<option value="' + esc(l) + '">').join('');
+  }
+
+  /* ---------- 操作 ---------- */
+  function waterPlant(id, date) {
+    const p = state.plants.find(x => x.id === id);
+    if (!p) return;
+    if (p.waterings.indexOf(date) !== -1) { toast('这一天已经记录过了'); return; }
+    mutate(() => { p.waterings.push(date); p.waterings.sort(); });
+    toast('已记录「' + p.name + '」浇水', '撤销', undo);
+  }
+
+  function seedDemo() {
+    const t = todayStr();
+    mutate(() => {
+      state.plants = [
+        { id: uid(), name: '月季', location: '阳台', intervalDays: 3, note: '喜水，土表干了就浇', createdAt: addDays(t, -30), waterings: [addDays(t, -12), addDays(t, -5)] },
+        { id: uid(), name: '龟背竹', location: '客厅', intervalDays: 7, note: '喜散光，别暴晒', createdAt: addDays(t, -60), waterings: [addDays(t, -14), addDays(t, -7)] },
+        { id: uid(), name: '绿萝', location: '阳台', intervalDays: 7, note: '见干见湿', createdAt: addDays(t, -90), waterings: [addDays(t, -13), addDays(t, -6)] },
+        { id: uid(), name: '多肉', location: '书房', intervalDays: 15, note: '宁干勿湿', createdAt: addDays(t, -120), waterings: [addDays(t, -21), addDays(t, -6)] }
+      ];
+    });
+    toast('已载入 4 盆示例植物', '撤销', undo);
+  }
+
+  function deletePlant(id) {
+    const p = state.plants.find(x => x.id === id);
+    if (!p) return;
+    confirmBox('确定删除「' + p.name + '」吗？它的浇水记录会一起删除。', () => {
+      mutate(() => {
+        state.plants = state.plants.filter(x => x.id !== id);
+        state.deletedIds = (state.deletedIds || []).concat([id]).slice(-200);
+      });
+      toast('已删除「' + p.name + '」', '撤销', undo);
+    });
+  }
+
+  /* ---------- 弹窗 ---------- */
+  function openMask(id) { $(id).classList.add('show'); }
+  function closeMask(id) { $(id).classList.remove('show'); }
+
+  function openPlantModal(id) {
+    editingId = id || null;
+    const p = id ? state.plants.find(x => x.id === id) : null;
+    $('#plantTitle').textContent = p ? '编辑植物' : '添加植物';
+    $('#fName').value = p ? p.name : '';
+    $('#fLoc').value = p ? p.location : '';
+    $('#fInterval').value = p ? p.intervalDays : 7;
+    $('#fNote').value = p ? p.note : '';
+    $('#fLast').value = p
+      ? (p.waterings.length ? p.waterings[p.waterings.length - 1] : p.createdAt)
+      : todayStr();
+    $('#fLast').max = todayStr();
+    openMask('#plantMask');
+    if (!p) setTimeout(() => $('#fName').focus(), 80);
+  }
+
+  function openWaterModal(id) {
+    wateringId = id;
+    const p = state.plants.find(x => x.id === id);
+    $('#waterTitle').textContent = '补记「' + (p ? p.name : '') + '」浇水';
+    $('#wDate').value = todayStr();
+    $('#wDate').max = todayStr();
+    openMask('#waterMask');
+  }
+
+  function confirmBox(msg, fn) {
+    $('#confirmMsg').textContent = msg;
+    confirmFn = fn;
+    openMask('#confirmMask');
+  }
+
+  /* ---------- Toast ---------- */
+  let toastTimer = null;
+  function toast(msg, actionLabel, actionFn) {
+    const el = $('#toast');
+    $('#toastMsg').textContent = msg;
+    const old = el.querySelector('button');
+    if (old) old.remove();
+    if (actionLabel) {
+      const b = document.createElement('button');
+      b.textContent = actionLabel;
+      b.onclick = () => { hideToast(); actionFn(); };
+      el.appendChild(b);
+    }
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 5000);
+  }
+  function hideToast() { $('#toast').classList.remove('show'); }
+
+  /* ---------- 备份 ---------- */
+  function exportData() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '养花备份-' + todayStr() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('备份已导出到下载目录');
+  }
+  function importData(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try { data = JSON.parse(reader.result); }
+      catch (e) { toast('导入失败：不是合法的 JSON 文件'); return; }
+      if (!data || !Array.isArray(data.plants)) { toast('导入失败：文件格式不对'); return; }
+      mutate(() => {
+        state.plants = data.plants.map(normalizePlant);
+        if (data.settings) {
+          state.settings = Object.assign({ seasonalEnabled: true, soonDays: 2 }, data.settings);
+        }
+        state.deletedIds = Array.from(new Set([].concat(state.deletedIds || [], data.deletedIds || [])));
+      });
+      toast('已导入 ' + state.plants.length + ' 盆花', '撤销', undo);
+    };
+    reader.readAsText(file);
+  }
+
+  /* ---------- 事件绑定 ---------- */
+  $('#list').addEventListener('click', e => {
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const id = card.dataset.id;
+    const actEl = e.target.closest('[data-act]');
+    const act = actEl ? actEl.dataset.act : null;
+    if (act === 'water') { waterPlant(id, todayStr()); return; }
+    if (act === 'add') { openWaterModal(id); return; }
+    if (act === 'edit') { openPlantModal(id); return; }
+    if (act === 'del') { deletePlant(id); return; }
+    if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+    renderList();
+  });
+
+  $('#filters').addEventListener('click', e => {
+    const chip = e.target.closest('.f-chip');
+    if (!chip) return;
+    filter = chip.dataset.loc;
+    renderFilters(); renderList();
+  });
+
+  $('#plantForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('#fName').value.trim();
+    if (!name) { toast('请填写名称'); return; }
+    const data = {
+      name: name,
+      location: $('#fLoc').value.trim() || '未分类',
+      intervalDays: Math.max(1, parseInt($('#fInterval').value, 10) || 7),
+      note: $('#fNote').value.trim()
+    };
+    const last = $('#fLast').value || todayStr();
+    if (editingId) {
+      mutate(() => {
+        const p = state.plants.find(x => x.id === editingId);
+        if (!p) return;
+        Object.assign(p, data);
+        p.waterings = p.waterings.filter(d => d <= last);
+        if (p.waterings.indexOf(last) === -1) p.waterings.push(last);
+        p.waterings.sort();
+        if (!p.createdAt || last < p.createdAt) p.createdAt = last;
+      });
+      toast('已保存修改');
+    } else {
+      mutate(() => {
+        state.plants.push(Object.assign({ id: uid(), createdAt: last, waterings: [last] }, data));
+      });
+      toast('已添加「' + name + '」', '撤销', undo);
+    }
+    closeMask('#plantMask');
+  });
+
+  $('#wOk').addEventListener('click', () => {
+    const d = $('#wDate').value;
+    if (!d) { toast('请选择日期'); return; }
+    closeMask('#waterMask');
+    waterPlant(wateringId, d);
+  });
+
+  $('#confirmOk').addEventListener('click', () => {
+    closeMask('#confirmMask');
+    if (confirmFn) { const f = confirmFn; confirmFn = null; f(); }
+  });
+
+  document.addEventListener('click', e => {
+    if (e.target.classList && e.target.classList.contains('mask')) e.target.classList.remove('show');
+    if (e.target.closest('[data-close]')) {
+      const m = e.target.closest('.mask');
+      if (m) m.classList.remove('show');
+    }
+  });
+
+  $('#fab').addEventListener('click', () => openPlantModal(null));
+
+  $('#seasonal').addEventListener('change', e => {
+    state.settings.seasonalEnabled = e.target.checked;
+    save(); render(); scheduleSync();
+    toast(e.target.checked ? '已开启季节修正' : '已关闭季节修正');
+  });
+
+  $('#soonDays').addEventListener('change', e => {
+    const n = parseInt(e.target.value, 10);
+    state.settings.soonDays = isNaN(n) ? 2 : Math.min(7, Math.max(0, n));
+    save(); render(); scheduleSync();
+  });
+
+  $('#btnExport').addEventListener('click', exportData);
+  $('#btnImport').addEventListener('click', () => $('#fileInput').click());
+  $('#fileInput').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) importData(f);
+    e.target.value = '';
+  });
+  $('#btnUndo').addEventListener('click', undo);
+
+  $('#btnSyncStart').addEventListener('click', syncStart);
+  $('#btnSyncNow').addEventListener('click', () => syncNow(false));
+  $('#btnSyncOff').addEventListener('click', syncStop);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && syncReady()) syncNow(true);
+  });
+
+  render();
+  renderSync();
+  if (syncReady()) syncNow(true);
+})();
+</script>
+</body>
+</html>
