@@ -186,7 +186,6 @@ header .date{font-size:13px;opacity:.85}
       <div class="field"><label>名称</label><input id="fName" placeholder="例如：绿萝" required></div>
       <div class="field"><label>位置</label><input id="fLoc" list="locList" placeholder="例如：阳台"><datalist id="locList"></datalist></div>
       <div class="field"><label>浇水间隔（天）</label><input id="fInterval" type="number" min="1" max="365" step="1" value="7"></div>
-      <div class="field"><label>上次浇水日</label><input id="fLast" type="date"></div>
       <div class="field"><label>备注（选填）</label><input id="fNote" placeholder="例如：见干见湿"></div>
       <div class="sheet-actions">
         <button type="button" class="btn ghost" data-close>取消</button>
@@ -516,13 +515,14 @@ header .date{font-size:13px;opacity:.85}
     else if (daysUntil <= state.settings.soonDays) level = 'soon';
     else level = 'ok';
 
-    return { last, interval, daysSince, daysUntil, level };
+    return { last, interval, daysSince, daysUntil, level, hasWatering: plant.waterings.length > 0 };
   }
   function statusLabel(st) {
-    if (st.daysUntil < 0) return '逾期 ' + (-st.daysUntil) + ' 天 · 上次 ' + shortDate(st.last);
-    if (st.daysUntil === 0) return '今天该浇 · 上次 ' + shortDate(st.last);
+    const lastTxt = st.hasWatering ? '上次 ' + shortDate(st.last) : '还没浇过';
+    if (st.daysUntil < 0) return '逾期 ' + (-st.daysUntil) + ' 天 · ' + lastTxt;
+    if (st.daysUntil === 0) return '今天该浇 · ' + lastTxt;
     if (st.daysUntil <= state.settings.soonDays) return '快该浇了 · 还剩 ' + st.daysUntil + ' 天';
-    return '还剩 ' + st.daysUntil + ' 天 · 上次 ' + shortDate(st.last);
+    return '还剩 ' + st.daysUntil + ' 天 · ' + lastTxt;
   }
 
   /* ---------- 变更与撤销 ---------- */
@@ -685,10 +685,6 @@ header .date{font-size:13px;opacity:.85}
     $('#fLoc').value = p ? p.location : '';
     $('#fInterval').value = p ? p.intervalDays : 7;
     $('#fNote').value = p ? p.note : '';
-    $('#fLast').value = p
-      ? (p.waterings.length ? p.waterings[p.waterings.length - 1] : p.createdAt)
-      : todayStr();
-    $('#fLast').max = todayStr();
     openMask('#plantMask');
     if (!p) setTimeout(() => $('#fName').focus(), 80);
   }
@@ -791,21 +787,16 @@ header .date{font-size:13px;opacity:.85}
       intervalDays: Math.max(1, parseInt($('#fInterval').value, 10) || 7),
       note: $('#fNote').value.trim()
     };
-    const last = $('#fLast').value || todayStr();
     if (editingId) {
       mutate(() => {
         const p = state.plants.find(x => x.id === editingId);
         if (!p) return;
         Object.assign(p, data);
-        p.waterings = p.waterings.filter(d => d <= last);
-        if (p.waterings.indexOf(last) === -1) p.waterings.push(last);
-        p.waterings.sort();
-        if (!p.createdAt || last < p.createdAt) p.createdAt = last;
       });
       toast('已保存修改');
     } else {
       mutate(() => {
-        state.plants.push(Object.assign({ id: uid(), createdAt: last, waterings: [last] }, data));
+        state.plants.push(Object.assign({ id: uid(), createdAt: todayStr(), waterings: [] }, data));
       });
       toast('已添加「' + name + '」', '撤销', undo);
     }
