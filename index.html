@@ -251,6 +251,7 @@ header .date{font-size:13px;opacity:.85}
   const SYNC_KEY = 'flower-water-reminder:sync';
   const GIST_FILE = 'flower-water-reminder.json';
   const SEASON_FACTOR = { 1:1.3, 2:1.3, 3:1, 4:1, 5:1, 6:0.7, 7:0.7, 8:0.7, 9:1, 10:1, 11:1, 12:1.3 };
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;   // 必须在 load() 之前声明，否则读取本地数据会静默失败
 
   const $ = s => document.querySelector(s);
   const uid = () => 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -294,7 +295,6 @@ header .date{font-size:13px;opacity:.85}
       plants: []
     };
   }
-  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   function isDate(s) {
     if (typeof s !== 'string' || !DATE_RE.test(s)) return false;
     const p = s.split('-').map(Number);
@@ -327,6 +327,7 @@ header .date{font-size:13px;opacity:.85}
         plants: s.plants.map(normalizePlant)
       };
     } catch (e) {
+      console.error('[养花提醒] 读取本地数据失败，已回退为空数据：', e);
       return defaultState();
     }
   }
@@ -592,6 +593,7 @@ header .date{font-size:13px;opacity:.85}
   }
 
   function renderFilters() {
+    const today = todayStr();
     const locs = Array.from(new Set(state.plants.map(p => p.location))).sort();
     const valid = ['全部', '待处理', 'due', 'over'].concat(locs);
     if (valid.indexOf(filter) === -1) filter = '全部';
